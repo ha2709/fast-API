@@ -1,5 +1,45 @@
-# API Server
-__pycache__
+# Python virtual environment
+venv/
+env/
+*.pyenv/
+.venv/
+pip-log.txt
 
-# Front-end
-frontend
+# Ignore Python bytecode files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Ignore local development and runtime files
+*.log
+db.sqlite3
+
+# Ignore IDE and editor-specific files
+.vscode/
+.idea/
+*.swp
+*~
+
+# Ignore dependency files (e.g., pipenv, poetry)
+Pipfile
+Pipfile.lock
+pyproject.toml
+
+# Ignore any compiled Python files
+*.pyc
+
+# Ignore compiled C extensions
+*.so
+
+# Ignore cache and temporary files
+__pycache__/
+*.swp
+*.bak
+
+# Ignore testing and coverage directories
+htmlcov/
+.coverage
+
+# Ignore Jupyter Notebook checkpoints
+.ipynb_checkpoints/

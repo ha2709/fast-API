@@ -1,11 +1,12 @@
 from fastapi import FastAPI, HTTPException, Security, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from database.query import query_get, query_put, query_update
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy.orm import Session
+# from models import User, SessionLocal, engine
+# from database.query import query_get, query_put, query_update
+# from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
-from user import Auth, SignInRequestModel, SignUpRequestModel, UserAuthResponseModel, UserUpdateRequestModel, UserResponseModel, register_user, signin_user, update_user, get_all_users, get_user_by_id
-from product import *
+from user import *
 from check_api_key import *
 app = FastAPI()
 
@@ -25,70 +26,94 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
- 
-
- 
 
 
 ################################
 ########## Users APIs ##########
 ################################
 
-@app.get("/v1/users", response_model=list[UserResponseModel])
-def get_all_users_api(api_key: str = Depends(check_api_key)):
+@app.post("/users/", response_model=User)
+def create_user(user: User, db: Session = Depends(SessionLocal),
+                api_key: str = Depends(check_api_key)):
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+@app.get("/v1/users" , response_model=list[User])
+def get_all_users( skip: int = 0, limit: int = 100,
+                   db: Session = Depends(SessionLocal),api_key: str = Depends(check_api_key)):
     """
     This users get API allow you to fetch all user data.
     """
  
-    user = get_all_users()
-    return JSONResponse(status_code=200, content=jsonable_encoder(user))
+    users = db.query(User).offset(skip).limit(limit).all()
+    return users
     
 
 
-@app.get("/v1/user/{user_id}", response_model=UserResponseModel)
-def get_user_api(user_id: int, api_key: str = Depends(check_api_key)):
+@app.get("/v1/users/{user_id}", response_model=User)
+def get_user(user_id: int,  db: Session = Depends(SessionLocal),
+                 api_key: str = Depends(check_api_key)):
     """
     This user API allow you to fetch specific user data.
     """
      
-    user = get_user_by_id(user_id)
-    return JSONResponse(status_code=200, content=jsonable_encoder(user))
+    user = db.query(User).filter(User.id == user_id).first()
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
+
      
 
 
-@app.post("/v1/user/update", response_model=UserResponseModel)
-def update_user_api(user_details: UserUpdateRequestModel, api_key: str = Depends(check_api_key)):
+@app.put("/v1/users/{user_id}", response_model=User)
+def update_user(user_id: int, user: User,   db: Session = Depends(SessionLocal), api_key: str = Depends(check_api_key)):
     """
     This user update API allow you to update user data.
     """
     
-    user = update_user(user_details)
-    return JSONResponse(status_code=200, content=jsonable_encoder(user))
-    
+    db_user = db.query(User).filter(User.id == user_id).first()
+    if db_user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    for attr, value in user.dict().items():
+        setattr(db_user, attr, value)
+    db.commit()
+    db.refresh(db_user)
+    return db_user
 
+
+@app.delete("/users/{user_id}", response_model=User)
+def delete_user(user_id: int, db: Session = Depends(SessionLocal)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    db.delete(user)
+    db.commit()
+    return user
 
 ################################
 ########## Product APIs ##########
 ################################
 
-@app.post('/v1/product', response_model=ProductResponseModel)
-def create_product_api(product_details: ProductResponseModel):
-    """
-    This sign-up API allow you to register your account, and return access token.
-    """
-    product = register_product(product_details)
+# @app.post('/v1/product', response_model=ProductResponseModel)
+# def create_product(product_details: ProductResponseModel):
+#     """
+#     This sign-up API allow you to register your account, and return access token.
+#     """
+#     product = register_product(product_details)
    
-    return JSONResponse(status_code=200, content=jsonable_encoder(product))
+#     return JSONResponse(status_code=200, content=jsonable_encoder(product))
 
 
-@app.get("/v1/products", response_model=list[ProductResponseModel])
-def get_all_products_api(api_key: str = Depends(check_api_key)):
-    """
-    This products get API allow you to fetch all product data.
-    """
+# @app.get("/v1/products", response_model=list[ProductResponseModel])
+# def get_all_products(api_key: str = Depends(check_api_key)):
+#     """
+#     This products get API allow you to fetch all product data.
+#     """
  
-    products = get_all_products()
-    return JSONResponse(status_code=200, content=jsonable_encoder(products))
+#     products = get_all_products()
+#     return JSONResponse(status_code=200, content=jsonable_encoder(products))
      
 
 ###############################
@@ -96,7 +121,7 @@ def get_all_products_api(api_key: str = Depends(check_api_key)):
 ###############################
 
 # @app.get('/secret')
-# def secret_data_api(api_key: str = Depends(check_api_key)):
+# def secret_data(api_key: str = Depends(check_key)):
 #     """
 #     This secret API is just for testing. Need access token to access this API.
 #     """
@@ -106,13 +131,13 @@ def get_all_products_api(api_key: str = Depends(check_api_key)):
 
 
 # @app.get('/not-secret')
-# def not_secret_data_api():
+# def not_secret_data():
 #     """
 #     This not-secret API is just for testing.
 #     """
 #     return 'Not secret data'
 
-# Define a route and apply the check_api_key dependency
+# Define a route and apply the check_key dependency
 @app.get("/secure-endpoint/")
 async def secure_endpoint(api_key: str = Depends(check_api_key)):
     return {"message": "This is a secure endpoint!"}
